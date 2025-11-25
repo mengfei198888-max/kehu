@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>客户跟进详情表 - 完整版（含合并导入/导出按钮）</title>
+  <style>
+    :root{--bg:#f6f8fb;--card:#fff;--accent:#2563eb;--muted:#61748a;--danger:#dc2626}
+    *{box-sizing:border-box}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial;background:var(--bg);margin:0;padding:24px;color:#0f172a}
+    .container{max-width:1100px;margin:0 auto}
+    header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;gap:12px}
+    h1{font-size:22px;margin:0}
+    .controls{display:flex;gap:8px;align-items:center}
+    select,button{font-size:14px;padding:6px 12px;border-radius:8px;border:1px solid #d0d7e8;background:#fff}
+    button{cursor:pointer;background:var(--accent);color:#fff;border:none}
+    .ghost{background:transparent;border:1px solid #d0d7e8;color:var(--accent)}
+    .cards{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .card{background:var(--card);border-radius:12px;padding:14px;box-shadow:0 6px 18px rgba(16,24,40,0.06)}
+    .card h2{margin:0 0 8px;font-size:16px}
+    label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
+    textarea.field{width:100%;min-height:32px;max-height:240px;padding:6px 10px;border-radius:8px;border:1px solid #e6eefb;background:#fbfdff;resize:none;font-size:14px;line-height:1.4}
+    textarea.field:focus{outline:none;box-shadow:0 6px 18px rgba(37,99,235,0.08);border-color:rgba(37,99,235,0.25)}
+    .section{margin-top:16px}
+    .progress-area{margin-top:10px;background:var(--card);padding:12px;border-radius:10px;box-shadow:0 4px 12px rgba(16,24,40,0.04)}
+    .progress-list{display:flex;flex-direction:column;gap:8px}
+    .step{display:flex;gap:8px;align-items:flex-start}
+    .step .field{flex:1}
+    .delete-btn{background:transparent;border:none;color:var(--danger);cursor:pointer;font-weight:600}
+    .delete-btn:hover{color:#991b1b}
+    .small{font-size:13px;color:var(--muted)}
+    footer{margin-top:12px;display:flex;justify-content:flex-end;gap:8px}
+    @media(max-width:780px){.cards{grid-template-columns:1fr 1fr}}
+
+    .dropdown{position:relative;}
+    .dropdown-menu{position:absolute;background:#fff;border:1px solid #d0d7e8;padding:6px 0;border-radius:8px;display:none;min-width:160px;box-shadow:0 4px 12px rgba(0,0,0,0.12);z-index:99}
+    .dropdown-item{padding:8px 14px;font-size:14px;cursor:pointer;white-space:nowrap}
+    .dropdown-item:hover{background:#f1f5ff;color:#2563eb}
+
+    /* Modal */
+    #modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      background: rgba(0,0,0,0.45);
+      z-index: 9999;
+      padding: 16px;
+    }
+    #modalCard {
+      background: #fff;
+      padding: 18px;
+      width: 520px;
+      max-width: calc(100% - 32px);
+      border-radius: 12px;
+      box-shadow: 0 8px 36px rgba(2,6,23,0.2);
+    }
+    #modalTitle{margin:0 0 8px;font-size:18px;color:#0f172a}
+    #modalBody{margin-top:8px}
+    #modalInput, #modalTextarea {
+      width:100%; border-radius:8px; border:1px solid #e6eefb; padding:8px; font-size:14px; min-height:36px;
+    }
+    #modalFooter{margin-top:12px;display:flex;justify-content:flex-end;gap:8px}
+
+    /* Toasts */
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      padding: 10px 14px;
+      border-radius: 10px;
+      box-shadow: 0 6px 18px rgba(16,24,40,0.12);
+      color: #fff;
+      opacity: 0;
+      transition: all .28s ease;
+      z-index: 10000;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { background: rgba(16,185,129,0.95); }
+    .toast.error { background: rgba(220,38,38,0.95); }
+    /* hidden file input */
+    #fileInput { display:none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>客户跟进详情表</h1>
+        <div class="small">桌面并排卡片 · Shift+Enter 换行 · Enter 保存</div>
+      </div>
+
+      <div class="controls">
+        <label class="small" style="margin-right:6px">当前客户</label>
+        <select id="clientSelect"></select>
+        <button id="addClient">+ 新客户</button>
+        <button id="renameClient" class="ghost">修改名称</button>
+        <button id="deleteClient" class="ghost delete-btn">删除客户</button>
+
+        <!-- 合并按钮 -->
+        <div class="dropdown">
+          <button id="ioMainBtn" class="ghost">导入 / 导出</button>
+          <div id="ioMenu" class="dropdown-menu" role="menu" aria-hidden="true">
+            <div class="dropdown-item" id="importText">📋 粘贴文本导入</div>
+            <div class="dropdown-item" id="uploadText">📄 上传 .txt 文件导入</div>
+            <div class="dropdown-item" id="exportClientBtn">⬇️ 导出当前客户</div>
+            <div class="dropdown-item" id="exportAllBtn">⬇️ 导出全部客户</div>
+          </div>
+        </div>
+
+        <input type="file" id="fileInput" accept=".txt,text/plain">
+      </div>
+    </header>
+
+    <div class="cards">
+      <div class="card">
+        <h2>客户信息</h2>
+        <label>姓名 / 年龄 / 地区</label>
+        <textarea class="field" data-key="client_basic"></textarea>
+        <label style="margin-top:8px">婚姻与家庭</label>
+        <textarea class="field" data-key="client_family"></textarea>
+        <label style="margin-top:8px">工作经历</label>
+        <textarea class="field" data-key="client_job"></textarea>
+        <label style="margin-top:8px">工作时间</label>
+        <textarea class="field" data-key="client_time"></textarea>
+        <label style="margin-top:8px">兴趣爱好</label>
+        <textarea class="field" data-key="client_hobby"></textarea>
+      </div>
+
+      <div class="card">
+        <h2>女主信息</h2>
+        <label>姓名 / 年龄 / 地区</label>
+        <textarea class="field" data-key="hero_basic"></textarea>
+        <label style="margin-top:8px">婚姻与家庭</label>
+        <textarea class="field" data-key="hero_family"></textarea>
+        <label style="margin-top:8px">工作情况</label>
+        <textarea class="field" data-key="hero_job"></textarea>
+        <label style="margin-top:8px">工作时间</label>
+        <textarea class="field" data-key="hero_time"></textarea>
+        <label style="margin-top:8px">兴趣爱好</label>
+        <textarea class="field" data-key="hero_hobby"></textarea>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>其他情况</h3>
+      <textarea class="field" data-key="extra" style="min-height:80px"></textarea>
+    </div>
+
+    <div class="section">
+      <h3>投资推进记录</h3>
+      <div class="progress-area">
+        <div id="progress" class="progress-list"></div>
+        <div style="margin-top:10px;display:flex;gap:8px">
+          <button id="addStep">+ 添加记录</button>
+          <button id="clearAll" class="ghost">清空所有</button>
+        </div>
+      </div>
+    </div>
+
+    <footer><div class="small" id="lastSaved"></div></footer>
+  </div>
+
+  <!-- Modal -->
+  <div id="modal" aria-hidden="true">
+    <div id="modalCard" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <h3 id="modalTitle"></h3>
+      <div id="modalBody">
+        <!-- dynamic -->
+        <textarea id="modalTextarea" style="display:none;"></textarea>
+        <input id="modalInput" style="display:none;" />
+        <div id="modalExtra" style="display:none;margin-top:8px"></div>
+      </div>
+      <div id="modalFooter">
+        <button id="modalCancel" class="ghost">取消</button>
+        <button id="modalOK">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toasts -->
+  <div id="toast" class="toast success" role="status" aria-live="polite"></div>
+  <div id="toastError" class="toast error" role="status" aria-live="polite"></div>
+
+  <script>
+    // helpers
+    function genId(){return 'id_'+Math.random().toString(36).slice(2,9);}
+    const emptyClient = {client_basic:'',client_family:'',client_job:'',client_time:'',client_hobby:'',hero_basic:'',hero_family:'',hero_job:'',hero_time:'',hero_hobby:'',extra:'',progress:[]};
+    const STORAGE_KEY = 'clients_data_v6';
+    const loadAll = ()=>{ try { return JSON.parse(localStorage.getItem(STORAGE_KEY)||'{}'); } catch(e) { return {}; } };
+    const saveAll = (obj)=>localStorage.setItem(STORAGE_KEY,JSON.stringify(obj));
+
+    // toast helpers
+    const toastEl = document.getElementById('toast');
+    const toastErrEl = document.getElementById('toastError');
+    let toastTimer = null;
+    function showToast(msg, type='success', ms=1600){
+      clearTimeout(toastTimer);
+      if(type==='error'){
+        toastErrEl.textContent = msg;
+        toastErrEl.classList.add('show');
+        toastEl.classList.remove('show');
+        toastTimer = setTimeout(()=>{ toastErrEl.classList.remove('show'); }, ms);
+      } else {
+        toastEl.textContent = msg;
+        toastEl.classList.add('show');
+        toastErrEl.classList.remove('show');
+        toastTimer = setTimeout(()=>{ toastEl.classList.remove('show'); }, ms);
+      }
+    }
+
+    // modal helper (callback style)
+    function showModal(options, callback){
+      // options: { title, placeholder, defaultValue, textarea:boolean, extraHtml }
+      const modal = document.getElementById('modal');
+      const title = document.getElementById('modalTitle');
+      const textarea = document.getElementById('modalTextarea');
+      const input = document.getElementById('modalInput');
+      const extra = document.getElementById('modalExtra');
+
+      title.textContent = options.title || '';
+      textarea.style.display = options.textarea ? 'block' : 'none';
+      input.style.display = options.textarea ? 'none' : 'block';
+      extra.style.display = options.extraHtml ? 'block' : 'none';
+
+      if(options.textarea){
+        textarea.value = options.defaultValue || '';
+        textarea.placeholder = options.placeholder || '';
+        textarea.focus();
+      } else {
+        input.value = options.defaultValue || '';
+        input.placeholder = options.placeholder || '';
+        input.type = options.type || 'text';
+        input.focus();
+      }
+
+      extra.innerHTML = options.extraHtml || '';
+
+      modal.style.display = 'flex';
+      modal.setAttribute('aria-hidden','false');
+
+      const okBtn = document.getElementById('modalOK');
+      const cancelBtn = document.getElementById('modalCancel');
+
+      function cleanup(){
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden','true');
+        okBtn.onclick = null;
+        cancelBtn.onclick = null;
+        document.onkeydown = null;
+      }
+
+      okBtn.onclick = ()=> {
+        const value = options.textarea ? textarea.value : input.value;
+        cleanup(); callback(value);
+      };
+      cancelBtn.onclick = ()=> { cleanup(); callback(null); };
+
+      document.onkeydown = function(e){
+        if(e.key === 'Escape'){ cleanup(); callback(null); }
+        if(e.key === 'Enter' && !e.shiftKey){
+          // if textarea visible, ignore Enter (user may want newline). For inputs, treat Enter as OK
+          if(!options.textarea){ cleanup(); callback(input.value); }
+        }
+      };
+    }
+
+    // state
+    let clients = loadAll();
+    if(Object.keys(clients).length===0){ clients['洋一'] = JSON.parse(JSON.stringify(emptyClient)); saveAll(clients); }
+
+    const select = document.getElementById('clientSelect');
+    const fields = document.querySelectorAll('textarea.field[data-key]');
+    const progressEl = document.getElementById('progress');
+    const lastSavedEl = document.getElementById('lastSaved');
+
+    let current = Object.keys(clients)[0];
+
+    // render select
+    function renderSelect(){
+      const names = Object.keys(clients);
+      select.innerHTML = '';
+      names.forEach(n=>{
+        const o = document.createElement('option'); o.value = n; o.textContent = n; select.appendChild(o);
+      });
+      // if current no longer exists, pick first
+      if(!clients[current] && names.length>0) current = names[0];
+      select.value = current || (names[0]||'');
+    }
+
+    function autoResize(el){ el.style.height = 'auto'; el.style.height = Math.max(32, el.scrollHeight) + 'px'; }
+
+    // saveClient supports optional showToast flag
+    function saveClient(showToast = true){
+      if(!current) return;
+      const d = clients[current] || (clients[current] = JSON.parse(JSON.stringify(emptyClient)));
+      fields.forEach(f => { d[f.dataset.key] = f.value; });
+      d.__lastSaved = new Date().toLocaleString();
+      saveAll(clients);
+      updateLastSaved();
+      if(showToast) showToastFn('已保存');
+    }
+
+    // wrapper to avoid name collision with showToast
+    function showToastFn(msg){ showToast(msg, 'success'); }
+
+    function showError(msg){ showToast(msg, 'error'); }
+
+    function loadClient(name){
+      // save current (only if exists and different from target)
+      if(current && clients[current] && current !== name){
+        saveClient(false);
+      }
+      current = name;
+      const d = clients[name] || JSON.parse(JSON.stringify(emptyClient));
+      if(!d.progress) d.progress = [];
+      fields.forEach(f => { f.value = d[f.dataset.key] || ''; autoResize(f); });
+      renderProgress();
+      renderSelect();
+      updateLastSaved();
+    }
+
+    function renderProgress(){
+      progressEl.innerHTML = '';
+      const list = (clients[current] && clients[current].progress) ? clients[current].progress : [];
+      list.forEach(item => {
+        const row = document.createElement('div'); row.className = 'step';
+        const ta = document.createElement('textarea'); ta.className = 'field';
+        ta.value = item.text || ''; autoResize(ta);
+        ta.addEventListener('input', ()=>autoResize(ta));
+        ta.addEventListener('keydown', e => { if(e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); ta.blur(); }});
+        ta.addEventListener('blur', ()=>{ item.text = ta.value; saveClient(); renderProgress(); });
+        const del = document.createElement('button'); del.textContent = '删除'; del.className = 'ghost';
+        del.onclick = ()=>{ clients[current].progress = clients[current].progress.filter(x=>x.id!==item.id); saveClient(); renderProgress(); };
+        row.append(ta, del);
+        progressEl.append(row);
+      });
+    }
+
+    // bind fields
+    fields.forEach(f=>{
+      autoResize(f);
+      f.addEventListener('input', ()=>autoResize(f));
+      f.addEventListener('keydown', e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); f.blur(); } });
+      f.addEventListener('blur', ()=> saveClient(true));
+    });
+
+    // add step
+    document.getElementById('addStep').addEventListener('click', ()=>{
+      if(!clients[current]) clients[current] = JSON.parse(JSON.stringify(emptyClient));
+      const step = { id: genId(), text: '' };
+      clients[current].progress.push(step);
+      saveAll(clients);
+      renderProgress();
+      requestAnimationFrame(()=>{ const last = progressEl.querySelectorAll('textarea.field'); if(last.length) last[last.length-1].focus(); });
+    });
+
+    // clear all with modal confirm
+    document.getElementById('clearAll').addEventListener('click', ()=>{
+      showModal({ title: '清空所有推进记录', textarea: false, defaultValue: '', placeholder: '输入 YES 确认清空' }, (v)=>{
+        if(v === 'YES'){
+          if(clients[current]) clients[current].progress = [];
+          saveClient();
+          renderProgress();
+          showToastFn('推进记录已清空');
+        } else if(v !== null) {
+          showToastFn('已取消');
+        }
+      });
+    });
+
+    // ADD CLIENT — use modal
+    document.getElementById('addClient').addEventListener('click', ()=>{
+      showModal({ title: '请输入新客户名称', textarea: false, defaultValue: '' }, (name)=>{
+        if(!name) { showToastFn('已取消'); return; }
+        if(clients[name]){
+          showModal({ title: '客户已存在，是否切换？输入 YES 切换', textarea: false, defaultValue: '' }, (ans)=>{
+            if(ans === 'YES') loadClient(name);
+            else showToastFn('已取消');
+          });
+          return;
+        }
+        // create empty client
+        clients[name] = JSON.parse(JSON.stringify(emptyClient));
+        saveAll(clients);
+        loadClient(name);
+        renderSelect();
+        saveClient(true);
+        showToastFn('已创建新客户：' + name);
+      });
+    });
+
+    // RENAME CLIENT
+    document.getElementById('renameClient').addEventListener('click', ()=>{
+      if(!current) { showError('无当前客户'); return; }
+      showModal({ title: '修改客户名称', textarea: false, defaultValue: current }, (newName)=>{
+        if(newName === null){ showToastFn('已取消'); return; }
+        newName = newName.trim();
+        if(!newName){ showError('名称不能为空'); return; }
+        if(newName === current){ showToastFn('名称未改变'); return; }
+        if(clients[newName]){ showError('名称已存在，请使用其他名称'); return; }
+
+        clients[newName] = clients[current];
+        delete clients[current];
+        saveAll(clients);
+        current = newName;
+        renderSelect();
+        loadClient(newName);
+        showToastFn('已重命名为：' + newName);
+      });
+    });
+
+    // DELETE CLIENT
+    document.getElementById('deleteClient').addEventListener('click', ()=>{
+      if(!current) { showError('无当前客户'); return; }
+      showModal({ title: '删除客户确认', textarea: false, defaultValue: '', placeholder: '输入 DELETE 确认' }, (v)=>{
+        if(v === 'DELETE'){
+          delete clients[current];
+          saveAll(clients);
+          const keys = Object.keys(clients);
+          if(keys.length>0) loadClient(keys[0]);
+          else { clients['新客户'] = JSON.parse(JSON.stringify(emptyClient)); saveAll(clients); loadClient('新客户'); }
+          renderSelect();
+          showToastFn('客户已删除');
+        } else {
+          showToastFn('已取消');
+        }
+      });
+    });
+
+    select.addEventListener('change', ()=> loadClient(select.value));
+
+    // EXPORT FUNCTIONS (unchanged logic)
+    function exportClient(name){
+      const d = clients[name] || emptyClient;
+      const lines = [];
+      lines.push('客户：' + (name||''));
+      lines.push('客户信息');
+      lines.push('姓名 / 年龄 / 地区：' + (d.client_basic||''));
+      lines.push('婚姻与家庭：' + (d.client_family||''));
+      lines.push('工作经历：' + (d.client_job||''));
+      lines.push('工作时间：' + (d.client_time||''));
+      lines.push('兴趣爱好：' + (d.client_hobby||''));
+      lines.push('');
+      lines.push('女主信息');
+      lines.push('姓名 / 年龄 / 地区：' + (d.hero_basic||''));
+      lines.push('婚姻与家庭：' + (d.hero_family||''));
+      lines.push('工作情况：' + (d.hero_job||''));
+      lines.push('工作时间：' + (d.hero_time||''));
+      lines.push('兴趣爱好：' + (d.hero_hobby||''));
+      lines.push('');
+      lines.push('其他情况');
+      lines.push(d.extra || '');
+      lines.push('');
+      lines.push('投资推进记录');
+      (d.progress||[]).forEach((p,i)=> lines.push((i+1)+'. '+(p.text||'')));
+      lines.push('');
+      lines.push('导出时间：' + new Date().toLocaleString());
+      const text = lines.join('\n');
+      const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      const safe = (name||'客户').replace(/[^\\w\\u4e00-\\u9fa5-]/g,'_');
+      a.download = `客户_${safe}_记录.txt`;
+      a.click(); URL.revokeObjectURL(a.href);
+      showToastFn('已导出：' + a.download);
+    }
+
+    function exportAll(){
+      const parts = [];
+      Object.keys(clients).forEach(name=>{
+        const d = clients[name] || emptyClient;
+        parts.push('====================');
+        parts.push('【客户：' + name + '】');
+        parts.push('====================');
+        parts.push('姓名 / 年龄 / 地区：' + (d.client_basic||''));
+        parts.push('婚姻与家庭：' + (d.client_family||''));
+        parts.push('工作经历：' + (d.client_job||''));
+        parts.push('工作时间：' + (d.client_time||''));
+        parts.push('兴趣爱好：' + (d.client_hobby||''));
+        parts.push('');
+        parts.push('女主信息：' + (d.hero_basic||''));
+        parts.push('婚姻与家庭：' + (d.hero_family||''));
+        parts.push('工作情况：' + (d.hero_job||''));
+        parts.push('工作时间：' + (d.hero_time||''));
+        parts.push('兴趣爱好：' + (d.hero_hobby||''));
+        parts.push('');
+        parts.push('其他情况：' + (d.extra||''));
+        parts.push('');
+        parts.push('投资推进记录：');
+        (d.progress||[]).forEach((p,i)=> parts.push('  ' + (i+1) + '. ' + (p.text||'')));
+        parts.push('\n');
+      });
+      parts.push('导出时间：' + new Date().toLocaleString());
+      const text = parts.join('\n');
+      const blob = new Blob([text], {type:'text/plain;charset=utf-8'});
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      a.download = '所有客户记录.txt';
+      a.click(); URL.revokeObjectURL(a.href);
+      showToastFn('已导出所有客户');
+    }
+
+    // IMPORT — parsing logic (kept from original)
+    function processImportedText(txt){
+      // try to extract a sensible name
+      let nameMatch = txt.match(/^(?:姓名|客户|Name)[\\s\\S]{0,12}?[:：]\\s*([^\\n\\r]+)/i);
+      let name = nameMatch ? nameMatch[1].trim() : ("导入客户_" + Date.now());
+
+      // if name exists, ask whether to overwrite or rename
+      if(clients[name]){
+        showModal({ title: '客户已存在，输入 O 覆盖 / R 重命名 / C 取消', textarea:false, defaultValue:'' }, (opt)=>{
+          if(opt === 'O'){ actuallyImport(name, txt, true); }
+          else if(opt === 'R'){ showModal({ title:'输入新客户名', textarea:false, defaultValue: name }, (newName)=>{ if(newName) actuallyImport(newName, txt, false); else showToastFn('已取消'); }); }
+          else { showToastFn('已取消'); }
+        });
+      } else {
+        actuallyImport(name, txt, false);
+      }
+    }
+
+    function actuallyImport(name, txt, overwrite){
+      try {
+        const d = JSON.parse(JSON.stringify(emptyClient));
+
+        function extractOnce(regex){
+          const m = txt.match(regex);
+          return m ? m[1].trim() : '';
+        }
+
+        d.client_basic = extractOnce(/(?:姓名|客户姓名|客户).*?[:：]\\s*([^\\n\\r]+)/i) || extractOnce(/姓名.*?[:：]\\s*([^\\n\\r]+)/i) || extractOnce(/Name.*?[:：]\\s*([^\\n\\r]+)/i);
+        d.client_family = extractOnce(/婚姻与家庭.*?[:：]\\s*([^\\n\\r]+)/i) || extractOnce(/婚姻.*?[:：]\\s*([^\\n\\r]+)/i);
+        d.client_job    = extractOnce(/工作(?:经历|情况).*?[:：]\\s*([^\\n\\r]+)/i) || extractOnce(/工作.*?[:：]\\s*([^\\n\\r]+)/i);
+        d.client_time   = extractOnce(/工作时间.*?[:：]\\s*([^\\n\\r]+)/i);
+        d.client_hobby  = extractOnce(/兴趣爱好.*?[:：]\\s*([^\\n\\r]+)/i);
+
+        d.hero_basic = extractOnce(/女主.*?姓名.*?[:：]\\s*([^\\n\\r]+)/i) || extractOnce(/女主姓名.*?[:：]\\s*([^\\n\\r]+)/i) || extractOnce(/女主.*?[:：]\\s*([^\\n\\r]+)/i);
+        d.hero_family = extractOnce(/女主.*?婚姻.*?[:：]\\s*([^\\n\\r]+)/i);
+        d.hero_job    = extractOnce(/女主.*?工作.*?[:：]\\s*([^\\n\\r]+)/i);
+        d.hero_time   = extractOnce(/女主.*?工作时间.*?[:：]\\s*([^\\n\\r]+)/i);
+        d.hero_hobby  = extractOnce(/女主.*?兴趣.*?[:：]\\s*([^\\n\\r]+)/i);
+
+        d.extra = (txt.match(/其他情况.*?[:：]\\s*([\\s\\S]*?)(\\n|$)/i) || ['',''])[1] || '';
+
+        // 投资推进记录 - look for section heading then lines starting with numbers or '-'
+        d.progress = [];
+        const progSection = txt.match(/投资推进记录[\\s\\S]*/i);
+        if(progSection){
+          const lines = progSection[0].split(/\\r?\\n/).slice(1);
+          lines.forEach(line=>{
+            const t = line.replace(/^\\s*[\\-\\*]?\\s*\\d*\\.*\\s*/, '').trim();
+            if(t) d.progress.push({ id: genId(), text: t });
+          });
+        } else {
+          // fallback: find lines that look like '1. ...' anywhere
+          const matches = txt.match(/^\\s*\\d+\\.\\s+.+$/gm);
+          if(matches) matches.forEach(m=> d.progress.push({id:genId(), text: m.replace(/^\\s*\\d+\\.\\s*/,'').trim()}));
+        }
+
+        if(!overwrite && clients[name]){
+          name = name + '_' + Date.now();
+        }
+
+        clients[name] = d;
+        saveAll(clients);
+        current = name;
+        renderSelect();
+        loadClient(name);
+        showToastFn('导入成功：' + name);
+      } catch (e) {
+        console.error(e);
+        showError('导入失败：解析错误');
+      }
+    }
+
+    // File upload handling
+    const fileInput = document.getElementById('fileInput');
+    fileInput.addEventListener('change', function(e){
+      const f = e.target.files && e.target.files[0];
+      if(!f) return;
+      if(!f.type.includes('text') && !f.name.endsWith('.txt')) { showError('只支持文本文件 (.txt)'); e.target.value = ''; return; }
+      const reader = new FileReader();
+      reader.onload = function(ev){
+        const txt = ev.target.result;
+        processImportedText(txt);
+      };
+      reader.readAsText(f, 'utf-8');
+      // reset input so same file can be uploaded again later
+      e.target.value = '';
+    });
+
+    // Dropdown behavior and binding to actions
+    const ioBtn = document.getElementById('ioMainBtn');
+    const ioMenu = document.getElementById('ioMenu');
+    const importTextBtn = document.getElementById('importText');
+    const uploadTextBtn = document.getElementById('uploadText');
+    const exportClientBtn = document.getElementById('exportClientBtn');
+    const exportAllBtn = document.getElementById('exportAllBtn');
+
+    ioBtn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const visible = ioMenu.style.display === 'block';
+      ioMenu.style.display = visible ? 'none' : 'block';
+      ioMenu.setAttribute('aria-hidden', visible ? 'true' : 'false');
+    });
+
+    // close menu when clicking outside
+    document.addEventListener('click', (e)=>{
+      if(!ioBtn.contains(e.target) && !ioMenu.contains(e.target)){
+        ioMenu.style.display = 'none';
+        ioMenu.setAttribute('aria-hidden', 'true');
+      }
+    });
+
+    // paste-text import
+    importTextBtn.addEventListener('click', ()=>{
+      ioMenu.style.display = 'none';
+      showModal({ title: '粘贴客户文本内容（支持常见字段）', textarea: true, defaultValue: '', placeholder: '将文本粘贴到此处，然后点击确定' }, (txt)=>{
+        if(!txt){ showToastFn('已取消'); return; }
+        processImportedText(txt);
+      });
+    });
+
+    // upload file import
+    uploadTextBtn.addEventListener('click', ()=>{
+      ioMenu.style.display = 'none';
+      fileInput.click();
+    });
+
+    // export actions
+    exportClientBtn.addEventListener('click', ()=>{
+      ioMenu.style.display = 'none';
+      if(!current){ showError('无当前客户'); return; }
+      exportClient(current);
+    });
+    exportAllBtn.addEventListener('click', ()=>{
+      ioMenu.style.display = 'none';
+      exportAll();
+    });
+
+    function updateLastSaved(){ lastSavedEl.textContent = '上次保存：' + (clients[current] && clients[current].__lastSaved ? clients[current].__lastSaved : '—'); }
+
+    // init
+    renderSelect();
+    loadClient(current);
+
+    // Accessibility: focus trapping not implemented (kept simple)
+  </script>
+</body>
+</html>
